@@ -27,7 +27,6 @@ psql -U admin -d healthsync_db -> now enter into psql , now query as needed
 
 
 
-https://accounts.google.com/o/oauth2/auth?client_id=532745854641-tkcf9fepfa26rbafmo0900k1r108via4.apps.googleusercontent.com&redirect_uri=http://localhost:8080/auth/google/callback&response_type=code&scope=email%20profile
 
 
 -----------------------------------------------------------------------------------------------------
