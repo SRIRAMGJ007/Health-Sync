@@ -3,4 +3,4 @@ bin/
 *.out
 *.log
 .env
-internal/scheduler/*.json
+*.json
