@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/SRIRAMGJ007/Health-Sync/internal/repository"
+	"github.com/SRIRAMGJ007/Health-Sync/internal/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -20,13 +21,23 @@ type UpdateUserRequest struct {
 	EmergencyContactRelation *string `json:"emergency_contact_relationship"`
 }
 
+type AvailabilityResponse struct {
+	ID               pgtype.UUID `json:"id"`
+	DoctorID         pgtype.UUID `json:"doctor_id"`
+	AvailabilityDate pgtype.Date `json:"availability_date"`
+	StartTime        string      `json:"start_time"`
+	EndTime          string      `json:"end_time"`
+	IsBooked         bool        `json:"is_booked"`
+}
+
 type DoctorResponse struct {
-	ID             pgtype.UUID `json:"id"`
-	Name           string      `json:"name"`
-	Specialization string      `json:"specialization"`
-	Experience     int32       `json:"experience"`
-	Qualification  string      `json:"qualification"`
-	HospitalName   string      `json:"hospital_name"`
+	ID             string                 `json:"id"`
+	Name           string                 `json:"name"`
+	Specialization string                 `json:"specialization"`
+	Experience     int32                  `json:"experience"`
+	Qualification  string                 `json:"qualification"`
+	HospitalName   string                 `json:"hospital_name"`
+	Availability   []AvailabilityResponse `json:"availability,omitempty"`
 }
 
 func UpdateUserProfile(ctx *gin.Context, queries *repository.Queries) {
@@ -102,7 +113,7 @@ func ListDoctorsHandler(ctx *gin.Context, queries *repository.Queries) {
 	resp := make([]DoctorResponse, len(doctors))
 	for i, doctor := range doctors {
 		resp[i] = DoctorResponse{
-			ID:             doctor.ID,
+			ID:             doctor.ID.String(),
 			Name:           doctor.Name,
 			Specialization: doctor.Specialization,
 			Experience:     doctor.Experience,
@@ -113,4 +124,53 @@ func ListDoctorsHandler(ctx *gin.Context, queries *repository.Queries) {
 
 	ctx.JSON(http.StatusOK, resp)
 
+}
+
+func GetDoctorByIDHandler(ctx *gin.Context, queries *repository.Queries) {
+	log.Println("GetDoctorByIDHandler: Request received")
+	doctorIDStr := ctx.Param("doctorId")
+
+	doctorID, err := uuid.Parse(doctorIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid doctor ID"})
+		return
+	}
+
+	parsedDoctorID := pgtype.UUID{Bytes: doctorID, Valid: true}
+
+	doctor, err := queries.GetDoctorByID(ctx, parsedDoctorID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Doctor not found"})
+		return
+	}
+
+	availability, err := queries.GetDoctorAvailabilityByDoctor(ctx, parsedDoctorID) // Assuming you have this function
+	if err != nil {
+		log.Printf("Error fetching availability: %v", err)
+		// We'll continue even if fetching availability fails
+	}
+
+	var availabilityResponses []AvailabilityResponse
+	for _, avail := range availability {
+		availabilityResponses = append(availabilityResponses, AvailabilityResponse{
+			ID:               avail.ID,
+			DoctorID:         avail.DoctorID,
+			AvailabilityDate: avail.AvailabilityDate,
+			StartTime:        utils.FormatTime(avail.StartTime),
+			EndTime:          utils.FormatTime(avail.EndTime),
+			IsBooked:         *avail.IsBooked,
+		})
+	}
+
+	resp := DoctorResponse{
+		ID:             doctor.ID.String(),
+		Name:           doctor.Name,
+		Specialization: doctor.Specialization,
+		Experience:     doctor.Experience,
+		Qualification:  doctor.Qualification,
+		HospitalName:   doctor.HospitalName,
+		Availability:   availabilityResponses,
+	}
+
+	ctx.JSON(http.StatusOK, resp)
 }

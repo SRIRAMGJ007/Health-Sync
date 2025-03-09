@@ -13,11 +13,14 @@ func UserRoutes(r *gin.Engine, queries *repository.Queries) {
 	userGroup := r.Group("/user")
 	userGroup.Use(middleware.ValidateJWT())
 	{
-		userGroup.PUT("/profile", func(ctx *gin.Context) {
+		userGroup.PUT("/updateprofile", func(ctx *gin.Context) {
 			user.UpdateUserProfile(ctx, queries)
 		})
 		userGroup.GET("/doctors", func(ctx *gin.Context) {
 			user.ListDoctorsHandler(ctx, queries)
+		})
+		userGroup.GET("/doctors/:doctorId", func(ctx *gin.Context) {
+			user.GetDoctorByIDHandler(ctx, queries)
 		})
 		userGroup.GET("/doctors/:doctorId/availability", func(ctx *gin.Context) {
 			doctor.GetAvailabilityByDoctorHandler(ctx, queries)

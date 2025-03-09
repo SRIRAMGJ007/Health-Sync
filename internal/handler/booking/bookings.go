@@ -19,12 +19,12 @@ type UpdateBookingStatusRequest struct {
 }
 
 type DoctorResponse struct {
-	ID             pgtype.UUID `json:"id"`
-	Name           string      `json:"name"`
-	Specialization string      `json:"specialization"`
-	Experience     int32       `json:"experience"`
-	Qualification  string      `json:"qualification"`
-	HospitalName   string      `json:"hospital_name"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Specialization string `json:"specialization"`
+	Experience     int32  `json:"experience"`
+	Qualification  string `json:"qualification"`
+	HospitalName   string `json:"hospital_name"`
 }
 
 type BookingResponse struct {
@@ -135,6 +135,12 @@ func GetBookingByIDHandler(ctx *gin.Context, queries *repository.Queries) {
 		return
 	}
 
+	doctor, err := queries.GetDoctorByID(ctx, booking.DoctorID) // Retrieve doctor
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Doctor not found"})
+		return
+	}
+
 	resp := BookingResponse{
 		ID:               booking.ID,
 		UserID:           booking.UserID,
@@ -144,6 +150,14 @@ func GetBookingByIDHandler(ctx *gin.Context, queries *repository.Queries) {
 		BookingStartTime: utils.FormatTime(booking.BookingStartTime),
 		BookingEndTime:   utils.FormatTime(booking.BookingEndTime),
 		Status:           booking.Status,
+		Doctor: DoctorResponse{
+			Name:           doctor.Name,
+			Specialization: doctor.Specialization,
+			ID:             booking.DoctorID.String(),
+			Experience:     doctor.Experience,
+			Qualification:  doctor.Qualification,
+			HospitalName:   doctor.HospitalName,
+		},
 	}
 
 	ctx.JSON(http.StatusOK, resp)
@@ -185,7 +199,7 @@ func GetBookingsByUserIDHandler(ctx *gin.Context, queries *repository.Queries) {
 			BookingEndTime:   utils.FormatTime(booking.BookingEndTime),
 			Status:           booking.Status,
 			Doctor: DoctorResponse{
-				ID:             doctor.ID,
+				ID:             doctor.ID.String(),
 				Name:           doctor.Name,
 				Specialization: doctor.Specialization,
 				HospitalName:   doctor.HospitalName,
