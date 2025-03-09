@@ -25,3 +25,130 @@ WHERE google_id = $1;
 UPDATE users
 SET password_hash = $2, updated_at = NOW()
 WHERE email = $1;
+
+-- name: UpdateUserProfile :exec
+UPDATE users
+SET 
+    name = COALESCE($1, name),
+    age = COALESCE($2, age),
+    gender = COALESCE($3, gender),
+    blood_group = COALESCE($4, blood_group),
+    emergency_contact_number = COALESCE($5, emergency_contact_number),
+    emergency_contact_relationship = COALESCE($6, emergency_contact_relationship),
+    updated_at = NOW()
+WHERE id = $7;
+
+
+-- name: GetUserByID :one
+select id, email, name, age, gender, blood_group, emergency_contact_number, emergency_contact_relationship, updated_at 
+FROM users 
+WHERE id = $1;
+
+
+-- name: CreateDoctor :one
+INSERT INTO doctors (
+    name,
+    specialization,
+    experience,
+    qualification,
+    hospital_name,
+    consultation_fee,
+    contact_number,
+    email,
+    password_hash
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
+)
+RETURNING id, name, specialization, experience, qualification, hospital_name, consultation_fee, contact_number, email, created_at, updated_at;
+
+-- name: GetDoctorByEmail :one
+SELECT id, name, specialization, experience, qualification, hospital_name, consultation_fee, contact_number, email, password_hash, created_at, updated_at
+FROM doctors
+WHERE email = $1;
+
+-- name: GetDoctorByID :one
+SELECT *
+FROM doctors
+WHERE id = $1;
+
+-- name: ListDoctors :many
+SELECT *
+FROM doctors;
+
+-- name: CreateDoctorAvailability :one
+INSERT INTO doctor_availability (doctor_id, availability_date, start_time, end_time)
+VALUES ($1, $2, $3, $4)
+RETURNING *;
+
+-- name: GetDoctorAvailabilityByID :one
+SELECT *
+FROM doctor_availability
+WHERE id = $1;
+
+-- name: GetDoctorAvailabilityByDoctorAndDate :many
+SELECT *
+FROM doctor_availability
+WHERE doctor_id = $1 AND availability_date = $2;
+
+-- name: GetDoctorAvailabilityByDoctor :many
+SELECT *
+FROM doctor_availability
+WHERE doctor_id = $1;
+
+-- name: UpdateDoctorAvailability :exec
+UPDATE doctor_availability
+SET
+    start_time = COALESCE($1, start_time),
+    end_time = COALESCE($2, end_time),
+    is_booked = COALESCE($3, is_booked),
+    updated_at = NOW()
+WHERE id = $4 AND doctor_id = $5;
+
+-- name: DeleteDoctorAvailability :exec
+DELETE FROM doctor_availability
+WHERE id = $1 AND doctor_id = $2;
+
+-- name: UpdateAvailabilityBookedStatus :exec
+UPDATE doctor_availability
+SET
+    is_booked = $1,
+    updated_at = NOW()
+WHERE id = $2;
+
+
+
+-- name: CreateBooking :one
+INSERT INTO bookings (user_id, doctor_id, availability_id, booking_date, booking_start_time, booking_end_time, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING *;
+
+-- name: GetBookingByID :one
+SELECT *
+FROM bookings
+WHERE id = $1;
+
+-- name: GetBookingsByUserID :many
+SELECT *
+FROM bookings
+WHERE user_id = $1;
+
+-- name: GetBookingsByDoctorID :many
+SELECT *
+FROM bookings
+WHERE doctor_id = $1;
+
+-- name: GetBookingsByAvailabilityID :many
+SELECT *
+FROM bookings
+WHERE availability_id = $1;
+
+-- name: DeleteBooking :exec
+DELETE FROM bookings
+WHERE id = $1;
+
+-- name: UpdateBookingStatus :exec
+UPDATE bookings
+SET
+    status = $1,
+    updated_at = NOW()
+WHERE id = $2;

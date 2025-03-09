@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/SRIRAMGJ007/Health-Sync/internal/database"
 	"github.com/SRIRAMGJ007/Health-Sync/internal/repository"
@@ -21,10 +20,6 @@ func init() {
 
 func main() {
 
-	log.Println("GOOGLE_CLIENT_ID:", os.Getenv("GOOGLE_CLIENT_ID"))
-	log.Println("GOOGLE_REDIRECT_URL:", os.Getenv("GOOGLE_REDIRECT_URL"))
-	fmt.Println("DATABASE_URL:", os.Getenv("DATABASE_URL"))
-
 	err := database.ConnectDB()
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -35,6 +30,8 @@ func main() {
 	r := gin.Default()
 
 	routes.AuthRoutes(r, queries)
+	routes.UserRoutes(r, queries)
+	routes.DoctorRoutes(r, queries)
 
 	fmt.Println("Health-Sync backend is running on port 8080...")
 	err = r.Run(":8080")

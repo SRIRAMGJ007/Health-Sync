@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -13,6 +12,8 @@ import (
 	"github.com/SRIRAMGJ007/Health-Sync/internal/utils"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/oauth2"
@@ -38,6 +39,19 @@ type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 	Name     string `json:"name" binding:"required"`
+	Role     string `json:"role" binding:"required"`
+}
+
+type DoctorRegisterRequest struct {
+	Email           string `json:"email" binding:"required,email"`
+	Password        string `json:"password" binding:"required,min=6"`
+	Name            string `json:"name" binding:"required"`
+	Specialization  string `json:"specialization" binding:"required"`
+	Experience      int32  `json:"experience" binding:"required"`
+	Qualification   string `json:"qualification" binding:"required"`
+	HospitalName    string `json:"hospital_name" binding:"required"`
+	ConsultationFee string `json:"consultation_fee" binding:"required"`
+	Role            string `json:"role" binding:"required"`
 }
 
 type Claims struct {
@@ -47,6 +61,12 @@ type Claims struct {
 }
 
 type LoginRequest struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Role     string `json:"role" binding:"required"`
+}
+
+type DoctorLoginRequest struct {
 	Email    string `json:"email" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
@@ -67,115 +87,304 @@ type GoogleUser struct {
 var googleOAuthConfig *oauth2.Config
 
 func RegisterHandler(ctx *gin.Context, queries *repository.Queries) {
-	log.Printf("register request recived")
 	var req RegisterRequest
-	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// cheching if user already exists..
-	_, err := queries.GetUserByEmail(dbCtx, req.Email)
-	if err == nil {
-		ctx.JSON(http.StatusConflict, gin.H{"error": "email already exists"})
-		log.Printf("register request failed user already exists")
+	if req.Role == "user" {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		hashedPasswordStr := string(hashedPassword)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		user, err := queries.CreateUserWithEmail(ctx, repository.CreateUserWithEmailParams{
+			Email:        req.Email,
+			PasswordHash: &hashedPasswordStr,
+			Name:         &req.Name,
+		})
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server err"})
+			return
+		}
+
+		token, err := utils.GenerateJWT(user.ID.String(), user.Email, "user")
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		ctx.JSON(http.StatusCreated, gin.H{
+			"message": "user created successfully",
+			"token":   token,
+			"user": gin.H{
+				"id":    user.ID,
+				"email": user.Email,
+				"name":  user.Name,
+			},
+		})
+	} else if req.Role == "doctor" {
+		var req DoctorRegisterRequest
+		if err := ctx.ShouldBindJSON(&req); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		hashedPasswordStr := string(hashedPassword)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		var consultationFee pgtype.Numeric
+		err = consultationFee.Scan(req.ConsultationFee) // Scan the string into pgtype.Numeric
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid consultation fee format"})
+			return
+		}
+		doctor, err := queries.CreateDoctor(ctx, repository.CreateDoctorParams{
+			Name:            req.Name,
+			Specialization:  req.Specialization,
+			Experience:      req.Experience,
+			Qualification:   req.Qualification,
+			HospitalName:    req.HospitalName,
+			ConsultationFee: consultationFee,
+			Email:           &req.Email,
+			PasswordHash:    &hashedPasswordStr,
+		})
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server err"})
+			return
+		}
+
+		token, err := utils.GenerateJWT(doctor.ID.String(), *doctor.Email, "doctor")
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"message": "Doctor login successful",
+			"token":   token,
+			"doctor": gin.H{
+				"id":               doctor.ID,
+				"email":            doctor.Email,
+				"name":             doctor.Name,
+				"specialization":   doctor.Specialization,
+				"experience":       doctor.Experience,
+				"qualification":    doctor.Qualification,
+				"hospital_name":    doctor.HospitalName,
+				"consultation_fee": doctor.ConsultationFee,
+			},
+		})
+	} else {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role"})
+	}
+}
+
+func UserRegisterHandler(ctx *gin.Context, queries *repository.Queries) {
+	var req RegisterRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hashedPasswordStr := string(hashedPassword)
 	if err != nil {
-		log.Println("error hashing the password: ", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
-	user, err := queries.CreateUserWithEmail(dbCtx, repository.CreateUserWithEmailParams{
+	user, err := queries.CreateUserWithEmail(ctx, repository.CreateUserWithEmailParams{
 		Email:        req.Email,
-		PasswordHash: sql.NullString{String: string(hashedPassword), Valid: true},
-		Name:         sql.NullString{String: string(req.Name), Valid: true},
+		PasswordHash: &hashedPasswordStr,
+		Name:         &req.Name,
 	})
-
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server err"})
 		return
 	}
 
-	token, err := utils.GenerateJWT(user.ID.String(), user.Email)
-
+	token, err := utils.GenerateJWT(user.ID.String(), user.Email, "user")
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
 	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "user created sucessfully",
+		"message": "User created successfully",
 		"token":   token,
 		"user": gin.H{
-			"Id":    user.ID,
+			"id":    user.ID,
 			"email": user.Email,
 			"name":  user.Name,
 		},
 	})
-
 }
 
-func LoginHandler(ctx *gin.Context, queries *repository.Queries) {
-	log.Printf("login request recived")
+func DoctorRegisterHandler(ctx *gin.Context, queries *repository.Queries) {
+	var req DoctorRegisterRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hashedPasswordStr := string(hashedPassword)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+
+	var consultationFee pgtype.Numeric
+	err = consultationFee.Scan(req.ConsultationFee)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid consultation fee format"})
+		return
+	}
+
+	doctor, err := queries.CreateDoctor(ctx, repository.CreateDoctorParams{
+		Name:            req.Name,
+		Specialization:  req.Specialization,
+		Experience:      req.Experience,
+		Qualification:   req.Qualification,
+		HospitalName:    req.HospitalName,
+		ConsultationFee: consultationFee,
+		Email:           &req.Email,
+		PasswordHash:    &hashedPasswordStr,
+	})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server err"})
+		return
+	}
+
+	token, err := utils.GenerateJWT(doctor.ID.String(), *doctor.Email, "doctor")
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Doctor created successfully",
+		"token":   token,
+		"doctor": gin.H{
+			"id":               doctor.ID,
+			"email":            doctor.Email,
+			"name":             doctor.Name,
+			"specialization":   doctor.Specialization,
+			"experience":       doctor.Experience,
+			"qualification":    doctor.Qualification,
+			"hospital_name":    doctor.HospitalName,
+			"consultation_fee": doctor.ConsultationFee,
+		},
+	})
+}
+
+func UserLoginHandler(ctx *gin.Context, queries *repository.Queries) {
+	log.Printf("user login request received")
+	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	var req LoginRequest
-
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid request"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		log.Println("error binding json: ", err)
 		return
 	}
 
-	user, err := queries.GetUserByEmail(ctx, req.Email)
+	user, err := queries.GetUserByEmail(dbCtx, req.Email)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid email or password"})
+		if err == pgx.ErrNoRows {
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 
-	if !user.PasswordHash.Valid {
-		// Handle NULL case
-		log.Println("password hash is NULL in the data base")
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-		return
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash.String), []byte(req.Password))
+	err = bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password))
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
 	}
 
-	token, err := utils.GenerateJWT(string(user.ID.String()), user.Email)
+	token, err := utils.GenerateJWT(user.ID.String(), user.Email, "user")
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
+
 	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Login successful",
+		"message": "User login successful",
 		"token":   token,
 		"user": gin.H{
-			"Id":    user.ID,
+			"id":    user.ID,
 			"email": user.Email,
-			"name":  string(user.Name.String),
+			"name":  user.Name,
 		},
 	})
+}
 
+func DoctorLoginHandler(ctx *gin.Context, queries *repository.Queries) {
+	log.Printf("doctor login request received")
+	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var req DoctorLoginRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		log.Println("error binding json: ", err)
+		return
+	}
+
+	doctor, err := queries.GetDoctorByEmail(dbCtx, &req.Email)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(*doctor.PasswordHash), []byte(req.Password))
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
+
+	token, err := utils.GenerateJWT(doctor.ID.String(), *doctor.Email, "doctor")
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Doctor login successful",
+		"token":   token,
+		"doctor": gin.H{
+			"id":               doctor.ID,
+			"email":            doctor.Email,
+			"name":             doctor.Name,
+			"specialization":   doctor.Specialization,
+			"experience":       doctor.Experience,
+			"qualification":    doctor.Qualification,
+			"hospital_name":    doctor.HospitalName,
+			"consultation_fee": doctor.ConsultationFee,
+		},
+	})
 }
 
 func GoogleAuthhandler(ctx *gin.Context, queries *repository.Queries) {
 
 	log.Printf("Googleauth request recived")
+	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	code := ctx.Query("code")
 	if code == "" {
@@ -184,7 +393,6 @@ func GoogleAuthhandler(ctx *gin.Context, queries *repository.Queries) {
 		return
 	}
 
-	log.Printf("Google OAuthConfig: %+v\n", googleOAuthConfig)
 	Gtoken, err := googleOAuthConfig.Exchange(context.Background(), code)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to exchange google token"})
@@ -210,26 +418,27 @@ func GoogleAuthhandler(ctx *gin.Context, queries *repository.Queries) {
 		log.Printf("failed to decode user info : %v ", err)
 		return
 	}
-
 	// check if user exist
-	user, err := queries.GetUserByGoogleID(ctx, sql.NullString{String: string(googleuser.ID), Valid: true})
+	user, err := queries.GetUserByGoogleID(ctx, &googleuser.ID)
 	// the below condition is for creating new google user
+	log.Println(" checking if user already exists ")
 	if err != nil {
-		if err == sql.ErrNoRows {
-			newuser, err := queries.CreateUserWithGoogle(ctx, repository.CreateUserWithGoogleParams{
-				GoogleID: sql.NullString{String: string(googleuser.ID), Valid: true},
+		if err == pgx.ErrNoRows {
+			newuser, err := queries.CreateUserWithGoogle(dbCtx, repository.CreateUserWithGoogleParams{
+				GoogleID: &googleuser.ID,
 				Email:    googleuser.Email,
-				Name:     sql.NullString{String: string(googleuser.Name), Valid: true},
+				Name:     &googleuser.Name,
 			})
 			if err != nil {
 				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
-				log.Printf("failed to create user :%vv", err)
+				log.Printf("failed to create user :%v", err)
 				return
 			}
 			// user = newuser
-			token, err := utils.GenerateJWT(newuser.ID.String(), newuser.Email)
+			token, err := utils.GenerateJWT(newuser.ID.String(), newuser.Email, "user")
 			if err != nil {
 				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+				log.Printf("failed to generate token for the  user :%v", err)
 				return
 			}
 
@@ -238,7 +447,7 @@ func GoogleAuthhandler(ctx *gin.Context, queries *repository.Queries) {
 				"message": "new user login successful",
 				"token":   token,
 				"user": gin.H{
-					"Id":    newuser.ID,
+					"id":    newuser.ID,
 					"email": newuser.Email,
 					"name":  newuser.Name,
 				},
@@ -246,10 +455,11 @@ func GoogleAuthhandler(ctx *gin.Context, queries *repository.Queries) {
 		}
 		return
 	}
-	// the below condition is for creating new google user
-	token, err := utils.GenerateJWT(user.ID.String(), user.Email)
+	// the below condition is for existing google user
+	token, err := utils.GenerateJWT(user.ID.String(), user.Email, "user")
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		log.Printf("failed to decode user info : %v ", err)
 		return
 	}
 
@@ -257,7 +467,7 @@ func GoogleAuthhandler(ctx *gin.Context, queries *repository.Queries) {
 		"message": "Login successful",
 		"token":   token,
 		"user": gin.H{
-			"Id":    user.ID,
+			"id":    user.ID,
 			"email": user.Email,
 			"name":  user.Name,
 		},

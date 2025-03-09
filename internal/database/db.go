@@ -1,28 +1,31 @@
 package database
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"os"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var DB *sql.DB
+var DB *pgxpool.Pool
 
 func ConnectDB() error {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		return fmt.Errorf(" DATABASE_URL is not set in environment variables")
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		return fmt.Errorf("DATABASE_URL is not set in environment variables")
 	}
 
 	var err error
 	for i := 0; i < 10; i++ { // Retry 10 times
-		DB, err = sql.Open("postgres", dbURL)
-		if err == nil && DB.Ping() == nil {
-			fmt.Println(" Connected to PostgreSQL successfully")
-			return nil
+		DB, err = pgxpool.New(context.Background(), databaseURL)
+		if err == nil {
+			err = DB.Ping(context.Background())
+			if err == nil {
+				fmt.Println("Connected to PostgreSQL successfully")
+				return nil
+			}
 		}
 
 		fmt.Println("Database not ready yet. Retrying in 3 seconds...")
