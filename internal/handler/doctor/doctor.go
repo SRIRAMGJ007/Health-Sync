@@ -146,7 +146,7 @@ func CreateAvailabilityHandler(ctx *gin.Context, queries *repository.Queries) {
 }
 
 func UpdateAvailabilityHandler(ctx *gin.Context, queries *repository.Queries) {
-
+	log.Println("UpdateAvailabilityHandler: Request received")
 	doctorID := ctx.Param("doctorId")
 	availabilityID := ctx.Param("availabilityId")
 
@@ -202,7 +202,13 @@ func UpdateAvailabilityHandler(ctx *gin.Context, queries *repository.Queries) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"message": "Availability updated successfully"})
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Availability updated successfully",
+		"updates": gin.H{
+			"start_time": req.StartTime,
+			"end_time":   req.EndTime,
+		},
+	})
 
 }
 

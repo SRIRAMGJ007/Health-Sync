@@ -44,6 +44,10 @@ select id, email, name, age, gender, blood_group, emergency_contact_number, emer
 FROM users 
 WHERE id = $1;
 
+-- name: GetUserProfileByID :one
+SELECT *
+FROM users
+WHERE id = $1;
 
 -- name: CreateDoctor :one
 INSERT INTO doctors (
@@ -152,3 +156,24 @@ SET
     status = $1,
     updated_at = NOW()
 WHERE id = $2;
+
+-- name: CreateMedication :one
+INSERT INTO medications (user_id, medication_name, dosage, time_to_notify, frequency)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING *;
+
+-- name: GetMedicationsToNotify :many
+SELECT *
+FROM medications
+WHERE time_to_notify = $1
+  AND (frequency = 'daily' OR (frequency = 'weekly' AND EXTRACT(DOW FROM NOW()) = EXTRACT(DOW FROM updated_at)));
+
+-- name: UpdateMedicationReadStatus :exec
+UPDATE medications
+SET is_readbyuser = TRUE
+WHERE id = $1;
+
+-- name: GetUserFCMToken :one
+SELECT fcm_token
+FROM users
+WHERE id = $1;

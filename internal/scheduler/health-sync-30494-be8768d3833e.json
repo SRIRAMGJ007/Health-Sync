@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "health-sync-30494",
+  "private_key_id": "be8768d3833e12532e594495be1bf0c296be7672",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCtYZKQrqLqw9QI\n8k9RyVUzhNJeez9c9pbB980nNQBDAMptLTzx3iY+t+Hq1DDyhBzzSXcv9hLNR13J\nF1VoBO+S0i/BvB4ApL31sRe+wlVw1QXanIR+VVeoJeQdGDg6W06gLoBmCAx2FhVz\nV9Hzwxq63TV+1vivEfwwbe4ArKE1m+A75nw7/T1k22HRXmgrgT+3NR4SL+16PZYf\nOf2VdbsZ9I6ffmkkxxHvz9pG0Sc65bwnciyxPA+reHmpGtZb3eJRAcTBzB7nsf9f\nUaDXRvkypqAPV3rnuiEyLaeHjHjchijISkfho8FYeGvJGB1rq915WVS4xOqysNAd\nkxjyqVa1AgMBAAECggEAIqlJuXpsL/ZHxqUYdd+D1LmWK9TEUVOrxmnBfffSzlJT\nZZmgYDMa3rl4pO9YPLdsKTfz56bwUdEVXvz28kVgVrAF45t1vQeyQTKu7lAf8B9q\nHO7i7vWlQUSX8rgTj5kO4ieBvEQaJ6ZZEfbJzotf5eEQz4Nu8mLsUYs8hC5+yP5E\n6cfOl7oodEPGhimM8CN2/7JHF8ztp2NNrxk8ljzU93HY6kexS5e/zMoC6aQNydL9\nmFn1+UBFoojTJot9ZDoQkW2MnMk76Nq2i4WPiaNPgbP5TPMPdr9pWdb6ZgdanijU\nKXKXR2PYwnSANJifv1xcYYf+V2ZYsYdG7NR3yMvZmQKBgQDe98LWFtOougPN1Pg7\nvdjkmSacmZxIiRAH0oNpoONddAL5zsSChAb04DAczmYYyswnNikiH6gwXohf4KYe\nmKP2gDW7nbxAiRBF4CQ/CetAINgoXY/YCWoYxgATNUZeu6xOLigxdtbELr3aSD3o\nghRcP73zBDyYWsD6BRvt0My9WQKBgQDHETIgEfhIw2YLNOaQl9/V1hA1tJ7t3xwY\nlOwpO1cOEFbWS08pI6dTNXI1nXIqTGzjtrXGxI0R5YqLzD5rTQEOScDS/t8tdVvH\nzga/JI0DV+UGk99l1MZkBywuuy0BeWjMNfgpUmiDuErxEYo17caoiRS4AgCg7u2O\nVcq7NKBsvQKBgANdX85VR9pq/DW1+g0Ev2oruX5xfv9FOj2z+pG0gNnfL1BPw31o\nuqYlX/R/VOEY5l3NHm/KZIJeWtZ/kGIz0X2dz7HGHpomt10mlcVxw+AS3tA1IT+U\nXMqE6mlfy3EQifggEDE25uTNA8Zwgqaol+AQgjBRpwxxiin7u8Ep/nz5AoGAIFDT\nUU95fd5yn1kcINb22FDi2sUSk80HU5pBaEQg0sCmSC17kVMfY6umebuwf9teRe0w\nPy9DM2ePATjL3UFn7Xjdm6MSed+2YY45nCgD2EoZfOLefjp3Zl+ftYpfOQELmTMd\nsR+WpeNyDwZo6G5MNKnkOibhET8YQ2X7/j4B2QUCgYBSVzv9TeqOdaERDjxRsKJ3\n+0t0q9LNqiJA1Kt8Sxswm91dp5EfhuPNeRljk69YOYqn0wfWp9YDxA7gDHkKCFnZ\nqQPhzgtlDRlP7D0xBMknGyRyK0lFu0UJwrvDE0xt678l8kHhIubprEruhZEx7e7v\n4BJLo2owSYprbLLMX9jGOw==\n-----END PRIVATE KEY-----\n",
+  "client_email": "com-example-health-sync-client@health-sync-30494.iam.gserviceaccount.com",
+  "client_id": "111344372104130538275",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/com-example-health-sync-client%40health-sync-30494.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

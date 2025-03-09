@@ -2,6 +2,7 @@ CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT,
+    fcm_token TEXT,
     google_id TEXT UNIQUE,
     name TEXT,
     age INT,
@@ -50,4 +51,16 @@ CREATE TABLE bookings (
     status TEXT NOT NULL, -- e.g., 'pending', 'confirmed', 'canceled', 'completed'
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE medications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) NOT NULL,
+    medication_name TEXT NOT NULL,
+    dosage TEXT NOT NULL,
+    time_to_notify TIME NOT NULL,
+    frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly')),
+    is_readbyuser BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -159,6 +159,43 @@ func (q *Queries) CreateDoctorAvailability(ctx context.Context, arg CreateDoctor
 	return i, err
 }
 
+const createMedication = `-- name: CreateMedication :one
+INSERT INTO medications (user_id, medication_name, dosage, time_to_notify, frequency)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, user_id, medication_name, dosage, time_to_notify, frequency, is_readbyuser, created_at, updated_at
+`
+
+type CreateMedicationParams struct {
+	UserID         pgtype.UUID
+	MedicationName string
+	Dosage         string
+	TimeToNotify   pgtype.Time
+	Frequency      string
+}
+
+func (q *Queries) CreateMedication(ctx context.Context, arg CreateMedicationParams) (Medication, error) {
+	row := q.db.QueryRow(ctx, createMedication,
+		arg.UserID,
+		arg.MedicationName,
+		arg.Dosage,
+		arg.TimeToNotify,
+		arg.Frequency,
+	)
+	var i Medication
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MedicationName,
+		&i.Dosage,
+		&i.TimeToNotify,
+		&i.Frequency,
+		&i.IsReadbyuser,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createUserWithEmail = `-- name: CreateUserWithEmail :one
 INSERT INTO users (email, password_hash, name)
 VALUES ($1, $2, $3)
@@ -547,6 +584,43 @@ func (q *Queries) GetDoctorByID(ctx context.Context, id pgtype.UUID) (Doctor, er
 	return i, err
 }
 
+const getMedicationsToNotify = `-- name: GetMedicationsToNotify :many
+SELECT id, user_id, medication_name, dosage, time_to_notify, frequency, is_readbyuser, created_at, updated_at
+FROM medications
+WHERE time_to_notify = $1
+  AND (frequency = 'daily' OR (frequency = 'weekly' AND EXTRACT(DOW FROM NOW()) = EXTRACT(DOW FROM updated_at)))
+`
+
+func (q *Queries) GetMedicationsToNotify(ctx context.Context, timeToNotify pgtype.Time) ([]Medication, error) {
+	rows, err := q.db.Query(ctx, getMedicationsToNotify, timeToNotify)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Medication
+	for rows.Next() {
+		var i Medication
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.MedicationName,
+			&i.Dosage,
+			&i.TimeToNotify,
+			&i.Frequency,
+			&i.IsReadbyuser,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, password_hash, google_id, name, created_at, updated_at
 FROM users
@@ -637,6 +711,46 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (GetUserByIDR
 		&i.BloodGroup,
 		&i.EmergencyContactNumber,
 		&i.EmergencyContactRelationship,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserFCMToken = `-- name: GetUserFCMToken :one
+SELECT fcm_token
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) GetUserFCMToken(ctx context.Context, id pgtype.UUID) (*string, error) {
+	row := q.db.QueryRow(ctx, getUserFCMToken, id)
+	var fcm_token *string
+	err := row.Scan(&fcm_token)
+	return fcm_token, err
+}
+
+const getUserProfileByID = `-- name: GetUserProfileByID :one
+SELECT id, email, password_hash, fcm_token, google_id, name, age, gender, blood_group, emergency_contact_number, emergency_contact_relationship, created_at, updated_at
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) GetUserProfileByID(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserProfileByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.FcmToken,
+		&i.GoogleID,
+		&i.Name,
+		&i.Age,
+		&i.Gender,
+		&i.BloodGroup,
+		&i.EmergencyContactNumber,
+		&i.EmergencyContactRelationship,
+		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -742,6 +856,17 @@ func (q *Queries) UpdateDoctorAvailability(ctx context.Context, arg UpdateDoctor
 		arg.ID,
 		arg.DoctorID,
 	)
+	return err
+}
+
+const updateMedicationReadStatus = `-- name: UpdateMedicationReadStatus :exec
+UPDATE medications
+SET is_readbyuser = TRUE
+WHERE id = $1
+`
+
+func (q *Queries) UpdateMedicationReadStatus(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, updateMedicationReadStatus, id)
 	return err
 }
 

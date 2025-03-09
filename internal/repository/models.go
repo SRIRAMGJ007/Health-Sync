@@ -47,10 +47,23 @@ type DoctorAvailability struct {
 	UpdatedAt        pgtype.Timestamp
 }
 
+type Medication struct {
+	ID             pgtype.UUID
+	UserID         pgtype.UUID
+	MedicationName string
+	Dosage         string
+	TimeToNotify   pgtype.Time
+	Frequency      string
+	IsReadbyuser   *bool
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
 type User struct {
 	ID                           pgtype.UUID
 	Email                        string
 	PasswordHash                 *string
+	FcmToken                     *string
 	GoogleID                     *string
 	Name                         *string
 	Age                          *int32

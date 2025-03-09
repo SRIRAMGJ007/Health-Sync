@@ -13,7 +13,11 @@ func UserRoutes(r *gin.Engine, queries *repository.Queries) {
 	userGroup := r.Group("/user")
 	userGroup.Use(middleware.ValidateJWT())
 	{
-		userGroup.PUT("/updateprofile", func(ctx *gin.Context) {
+
+		userGroup.GET("/:userid/profile", func(ctx *gin.Context) {
+			user.GetUserProfile(ctx, queries)
+		})
+		userGroup.PUT("/updateprofile/:id", func(ctx *gin.Context) {
 			user.UpdateUserProfile(ctx, queries)
 		})
 		userGroup.GET("/doctors", func(ctx *gin.Context) {
@@ -36,6 +40,12 @@ func UserRoutes(r *gin.Engine, queries *repository.Queries) {
 		})
 		userGroup.DELETE("/bookings/:bookingId", func(ctx *gin.Context) {
 			booking.DeleteBookingHandler(ctx, queries)
+		})
+		userGroup.POST("/:user_id/medications", func(ctx *gin.Context) { //Added medication schedule
+			user.CreateMedicationHandler(ctx, queries)
+		})
+		userGroup.PUT("/:user_id/medications/:medication_id/read", func(ctx *gin.Context) { //Added medication mark read
+			user.MarkMedicationAsReadHandler(ctx, queries)
 		})
 	}
 }

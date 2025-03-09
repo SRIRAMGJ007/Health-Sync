@@ -21,7 +21,7 @@ func DoctorRoutes(r *gin.Engine, queries *repository.Queries) {
 		doctorGroup.GET("/date/:date", func(ctx *gin.Context) {
 			doctor.GetAvailabilityByDoctorAndDateHandler(ctx, queries)
 		})
-		doctorGroup.PUT("/:availabilityId", func(ctx *gin.Context) {
+		doctorGroup.PUT("/:availabilityId/update", func(ctx *gin.Context) {
 			doctor.UpdateAvailabilityHandler(ctx, queries)
 		})
 		doctorGroup.GET("/bookings", func(ctx *gin.Context) {
@@ -29,6 +29,9 @@ func DoctorRoutes(r *gin.Engine, queries *repository.Queries) {
 		})
 		doctorGroup.PUT("/bookings/:bookingId/status", func(ctx *gin.Context) {
 			booking.UpdateBookingStatusHandler(ctx, queries)
+		})
+		doctorGroup.DELETE("/:availabilityId/delete", func(ctx *gin.Context) {
+			doctor.DeleteAvailabilityHandler(ctx, queries)
 		})
 	}
 }

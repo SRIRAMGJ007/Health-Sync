@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/SRIRAMGJ007/Health-Sync/internal/repository"
 	"github.com/SRIRAMGJ007/Health-Sync/internal/utils"
@@ -30,6 +31,17 @@ type AvailabilityResponse struct {
 	IsBooked         bool        `json:"is_booked"`
 }
 
+type UserProfileResponse struct {
+	ID                           string `json:"id"`
+	Email                        string `json:"email"`
+	Name                         string `json:"name,omitempty"`
+	Age                          int32  `json:"age,omitempty"`
+	Gender                       string `json:"gender,omitempty"`
+	BloodGroup                   string `json:"blood_group,omitempty"`
+	EmergencyContactNumber       string `json:"emergency_contact_number,omitempty"`
+	EmergencyContactRelationship string `json:"emergency_contact_relationship,omitempty"`
+}
+
 type DoctorResponse struct {
 	ID             string                 `json:"id"`
 	Name           string                 `json:"name"`
@@ -40,10 +52,31 @@ type DoctorResponse struct {
 	Availability   []AvailabilityResponse `json:"availability,omitempty"`
 }
 
+type CreateMedicationRequest struct {
+	MedicationName string `json:"medication_name" binding:"required"`
+	Dosage         string `json:"dosage" binding:"required"`
+	TimeToNotify   string `json:"time_to_notify" binding:"required"`
+	Frequency      string `json:"frequency" binding:"required,oneof=daily weekly"` // Use oneof for validation
+}
+
+func safeDerefString(s *string) string {
+	if s != nil {
+		return *s
+	}
+	return ""
+}
+
+func safeDerefInt32(i *int32) int32 {
+	if i != nil {
+		return *i
+	}
+	return 0 // Or -1 for "unset" indication
+}
+
 func UpdateUserProfile(ctx *gin.Context, queries *repository.Queries) {
 	var req UpdateUserRequest
 
-	userID := ctx.Query("id")
+	userID := ctx.Param("id")
 	if userID == "" {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "userid missing"})
 		log.Println("update user profile failed -> query parameter id missing, bad reuest")
@@ -173,4 +206,136 @@ func GetDoctorByIDHandler(ctx *gin.Context, queries *repository.Queries) {
 	}
 
 	ctx.JSON(http.StatusOK, resp)
+}
+
+func GetUserProfile(ctx *gin.Context, queries *repository.Queries) {
+
+	log.Println("GetUserProfile: Request received")
+	userIDStr := ctx.Param("userid")
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	parsedUserID := pgtype.UUID{Bytes: userID, Valid: true}
+
+	user, err := queries.GetUserProfileByID(ctx, parsedUserID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "User not found"})
+		return
+	}
+
+	resp := UserProfileResponse{
+		ID:                           user.ID.String(),
+		Email:                        user.Email,
+		Name:                         safeDerefString(user.Name),
+		Age:                          safeDerefInt32(user.Age),
+		Gender:                       safeDerefString(user.Gender),
+		BloodGroup:                   safeDerefString(user.BloodGroup),
+		EmergencyContactNumber:       safeDerefString(user.EmergencyContactNumber),
+		EmergencyContactRelationship: safeDerefString(user.EmergencyContactRelationship),
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+
+}
+
+func CreateMedicationHandler(ctx *gin.Context, queries *repository.Queries) {
+	userIDStr := ctx.Param("user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		log.Printf("CreateMedicationHandler: Invalid user ID: %v", err)
+		return
+	}
+
+	var req CreateMedicationRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		log.Printf("CreateMedicationHandler: Invalid request body: %v", err)
+		return
+	}
+
+	// Validate TimeToNotify format
+	_, err = time.Parse("15:04:05", req.TimeToNotify)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid time_to_notify format. Use HH:MM:SS"})
+		log.Printf("CreateMedicationHandler: Invalid time format: %v", err)
+		return
+	}
+
+	// Parse time in IST
+	ist, err := time.LoadLocation("Asia/Kolkata") // Load IST location
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load IST location"})
+		log.Printf("CreateMedicationHandler: Failed to load IST location: %v", err)
+		return
+	}
+
+	timeToNotify, err := time.ParseInLocation("15:04:05", req.TimeToNotify, ist) // Parse with IST location
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid time_to_notify format. Use HH:MM:SS in IST"})
+		log.Printf("CreateMedicationHandler: Invalid time format: %v", err)
+		return
+	}
+
+	// Convert time to pgtype.Time (UTC)
+	utcTime := timeToNotify.UTC() // convert time to UTC for storing in database.
+	pgxTime := pgtype.Time{
+		Microseconds: int64((utcTime.Hour()*3600 + utcTime.Minute()*60 + utcTime.Second()) * 1e6),
+		Valid:        true,
+	}
+
+	medication, err := queries.CreateMedication(ctx, repository.CreateMedicationParams{
+		UserID:         pgtype.UUID{Bytes: userID, Valid: true},
+		MedicationName: req.MedicationName,
+		Dosage:         req.Dosage,
+		TimeToNotify:   pgxTime,
+		Frequency:      req.Frequency,
+	})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create medication"})
+		log.Printf("CreateMedicationHandler: Failed to create medication: %v", err)
+		return
+	}
+
+	readableTime := time.Unix(0, medication.TimeToNotify.Microseconds*1000).UTC().Format("15:04:05")
+	response := gin.H{
+		"medication": gin.H{
+			"ID":             medication.ID,
+			"UserID":         medication.UserID,
+			"MedicationName": medication.MedicationName,
+			"Dosage":         medication.Dosage,
+			"TimeToNotify":   readableTime, // Use the readable time
+			"Frequency":      medication.Frequency,
+			"IsReadbyuser":   medication.IsReadbyuser,
+			"CreatedAt":      medication.CreatedAt,
+			"UpdatedAt":      medication.UpdatedAt,
+		},
+		"message": "Medication scheduled successfully",
+	}
+
+	ctx.JSON(http.StatusCreated, gin.H{"message": "Medication scheduled successfully", "medication": response})
+}
+
+func MarkMedicationAsReadHandler(ctx *gin.Context, queries *repository.Queries) {
+	medicationIDStr := ctx.Param("medication_id")
+
+	medicationID, err := uuid.Parse(medicationIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid medication ID"})
+		log.Printf("MarkMedicationAsReadHandler: Invalid medication ID: %v", err)
+		return
+	}
+
+	err = queries.UpdateMedicationReadStatus(ctx, pgtype.UUID{Bytes: medicationID, Valid: true})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark medication as read"})
+		log.Printf("MarkMedicationAsReadHandler: Failed to mark medication as read: %v", err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "Medication marked as read"})
 }
