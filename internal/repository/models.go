@@ -47,6 +47,14 @@ type DoctorAvailability struct {
 	UpdatedAt        pgtype.Timestamp
 }
 
+type EncryptedFile struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	FileName  string
+	FileData  []byte
+	CreatedAt pgtype.Timestamp
+}
+
 type Medication struct {
 	ID             pgtype.UUID
 	UserID         pgtype.UUID

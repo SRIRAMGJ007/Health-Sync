@@ -41,11 +41,14 @@ func UserRoutes(r *gin.Engine, queries *repository.Queries) {
 		userGroup.DELETE("/bookings/:bookingId", func(ctx *gin.Context) {
 			booking.DeleteBookingHandler(ctx, queries)
 		})
-		userGroup.POST("/:user_id/medications", func(ctx *gin.Context) { //Added medication schedule
+		userGroup.POST("/:user_id/medications", func(ctx *gin.Context) {
 			user.CreateMedicationHandler(ctx, queries)
 		})
-		userGroup.PUT("/:user_id/medications/:medication_id/read", func(ctx *gin.Context) { //Added medication mark read
+		userGroup.PUT("/:user_id/medications/:medication_id/read", func(ctx *gin.Context) {
 			user.MarkMedicationAsReadHandler(ctx, queries)
+		})
+		userGroup.GET("/getmedications/:user_id", func(c *gin.Context) {
+			user.GetMedicationsByUserIDHandler(c, queries)
 		})
 	}
 }

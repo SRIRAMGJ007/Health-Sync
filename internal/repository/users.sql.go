@@ -584,6 +584,74 @@ func (q *Queries) GetDoctorByID(ctx context.Context, id pgtype.UUID) (Doctor, er
 	return i, err
 }
 
+const getEncryptedFile = `-- name: GetEncryptedFile :one
+SELECT file_name, file_data FROM encrypted_files WHERE user_id = $1 AND id = $2
+`
+
+type GetEncryptedFileParams struct {
+	UserID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+type GetEncryptedFileRow struct {
+	FileName string
+	FileData []byte
+}
+
+func (q *Queries) GetEncryptedFile(ctx context.Context, arg GetEncryptedFileParams) (GetEncryptedFileRow, error) {
+	row := q.db.QueryRow(ctx, getEncryptedFile, arg.UserID, arg.ID)
+	var i GetEncryptedFileRow
+	err := row.Scan(&i.FileName, &i.FileData)
+	return i, err
+}
+
+const getMedicationsByUserID = `-- name: GetMedicationsByUserID :many
+SELECT
+    id,
+    user_id,
+    medication_name,
+    dosage,
+    time_to_notify,
+    frequency,
+    is_readbyuser,
+    created_at,
+    updated_at
+FROM
+    medications
+WHERE
+    user_id = $1
+`
+
+func (q *Queries) GetMedicationsByUserID(ctx context.Context, userID pgtype.UUID) ([]Medication, error) {
+	rows, err := q.db.Query(ctx, getMedicationsByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Medication
+	for rows.Next() {
+		var i Medication
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.MedicationName,
+			&i.Dosage,
+			&i.TimeToNotify,
+			&i.Frequency,
+			&i.IsReadbyuser,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getMedicationsToNotify = `-- name: GetMedicationsToNotify :many
 SELECT id, user_id, medication_name, dosage, time_to_notify, frequency, is_readbyuser, created_at, updated_at
 FROM medications
@@ -729,6 +797,39 @@ func (q *Queries) GetUserFCMToken(ctx context.Context, id pgtype.UUID) (*string,
 	return fcm_token, err
 }
 
+const getUserFiles = `-- name: GetUserFiles :many
+SELECT id, user_id, file_name, file_data, created_at
+FROM encrypted_files 
+WHERE user_id = $1 
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetUserFiles(ctx context.Context, userID pgtype.UUID) ([]EncryptedFile, error) {
+	rows, err := q.db.Query(ctx, getUserFiles, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EncryptedFile
+	for rows.Next() {
+		var i EncryptedFile
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FileName,
+			&i.FileData,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserProfileByID = `-- name: GetUserProfileByID :one
 SELECT id, email, password_hash, fcm_token, google_id, name, age, gender, blood_group, emergency_contact_number, emergency_contact_relationship, created_at, updated_at
 FROM users
@@ -792,6 +893,30 @@ func (q *Queries) ListDoctors(ctx context.Context) ([]Doctor, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const storeEncryptedFile = `-- name: StoreEncryptedFile :one
+INSERT INTO encrypted_files (user_id, file_name, file_data)
+VALUES ($1, $2, $3)
+RETURNING id, created_at
+`
+
+type StoreEncryptedFileParams struct {
+	UserID   pgtype.UUID
+	FileName string
+	FileData []byte
+}
+
+type StoreEncryptedFileRow struct {
+	ID        pgtype.UUID
+	CreatedAt pgtype.Timestamp
+}
+
+func (q *Queries) StoreEncryptedFile(ctx context.Context, arg StoreEncryptedFileParams) (StoreEncryptedFileRow, error) {
+	row := q.db.QueryRow(ctx, storeEncryptedFile, arg.UserID, arg.FileName, arg.FileData)
+	var i StoreEncryptedFileRow
+	err := row.Scan(&i.ID, &i.CreatedAt)
+	return i, err
 }
 
 const updateAvailabilityBookedStatus = `-- name: UpdateAvailabilityBookedStatus :exec

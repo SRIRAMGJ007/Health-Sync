@@ -264,17 +264,21 @@ func GetAvailabilityByDoctorHandler(ctx *gin.Context, queries *repository.Querie
 	doctorUUID, err := uuid.Parse(doctorID)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid doctor ID"})
+		log.Println("Error parsing doctor ID:", err)
 		return
 	}
 	parsedDoctorID := pgtype.UUID{Bytes: doctorUUID, Valid: true}
 
 	availabilitySlots, err := queries.GetDoctorAvailabilityByDoctor(ctx, parsedDoctorID)
+	log.Printf("response: %v ----> error is %v", availabilitySlots, err)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Println("Database error:", err)
 		return
 	}
 
 	resp := make([]AvailabilityResponse, len(availabilitySlots))
+	log.Printf("response: %v", resp)
 	for i, slot := range availabilitySlots {
 		resp[i] = AvailabilityResponse{
 			ID:               slot.ID,
@@ -285,6 +289,7 @@ func GetAvailabilityByDoctorHandler(ctx *gin.Context, queries *repository.Querie
 			IsBooked:         *slot.IsBooked,
 		}
 	}
+	log.Printf("response: %v", resp)
 
 	ctx.JSON(http.StatusOK, resp)
 

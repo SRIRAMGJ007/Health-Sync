@@ -339,3 +339,38 @@ func MarkMedicationAsReadHandler(ctx *gin.Context, queries *repository.Queries) 
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "Medication marked as read"})
 }
+
+func GetMedicationsByUserIDHandler(ctx *gin.Context, queries *repository.Queries) {
+	userIDStr := ctx.Param("user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		log.Printf("GetMedicationsByUserIDHandler: Invalid user ID: %v", err)
+		return
+	}
+
+	medications, err := queries.GetMedicationsByUserID(ctx, pgtype.UUID{Bytes: userID, Valid: true})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve medications"})
+		log.Printf("GetMedicationsByUserIDHandler: Failed to retrieve medications: %v", err)
+		return
+	}
+
+	// Format the response
+	response := make([]gin.H, len(medications))
+	for i, medication := range medications {
+		readableTime := time.Unix(0, medication.TimeToNotify.Microseconds*1000).UTC().Format("15:04:05") //Format time
+		response[i] = gin.H{
+			"ID":             medication.ID,
+			"MedicationName": medication.MedicationName,
+			"Dosage":         medication.Dosage,
+			"TimeToNotify":   readableTime, // Format time
+			"Frequency":      medication.Frequency,
+			"IsReadbyuser":   medication.IsReadbyuser,
+			"CreatedAt":      medication.CreatedAt,
+			"UpdatedAt":      medication.UpdatedAt,
+		}
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"medications": response})
+}

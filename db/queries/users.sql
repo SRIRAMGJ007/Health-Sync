@@ -177,3 +177,33 @@ WHERE id = $1;
 SELECT fcm_token
 FROM users
 WHERE id = $1;
+
+-- name: GetMedicationsByUserID :many
+SELECT
+    id,
+    user_id,
+    medication_name,
+    dosage,
+    time_to_notify,
+    frequency,
+    is_readbyuser,
+    created_at,
+    updated_at
+FROM
+    medications
+WHERE
+    user_id = $1;
+
+-- name: StoreEncryptedFile :one
+INSERT INTO encrypted_files (user_id, file_name, file_data)
+VALUES ($1, $2, $3)
+RETURNING id, created_at;
+
+-- name: GetEncryptedFile :one
+SELECT file_name, file_data FROM encrypted_files WHERE user_id = $1 AND id = $2;
+
+-- name: GetUserFiles :many
+SELECT *
+FROM encrypted_files 
+WHERE user_id = $1 
+ORDER BY created_at DESC;

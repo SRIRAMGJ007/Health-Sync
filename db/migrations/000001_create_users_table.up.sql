@@ -64,3 +64,11 @@ CREATE TABLE medications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE TABLE encrypted_files (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    file_name TEXT NOT NULL,
+    file_data BYTEA NOT NULL,  -- Stores encrypted file
+    created_at TIMESTAMP DEFAULT NOW()
+);
