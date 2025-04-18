@@ -1,35 +1,23 @@
-# Use official Golang image with correct version
-FROM golang:1.23 AS builder  
+# Use Go 1.23 image
+FROM golang:1.23
 
-# Set working directory
-WORKDIR /app
+# Set the working directory
+WORKDIR /Health-Sync
 
-# Copy Go modules and install dependencies
-COPY go.mod go.sum ./  
-RUN go mod download  
+# Copy go.mod and go.sum first for better caching
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Copy the source code
+# Copy the rest of the code
 COPY . .
 
-# Build the application
-RUN go build -o healthsync ./cmd/main.go  
+WORKDIR /Health-Sync/cmd
 
-# Use a lightweight image for the final container
-FROM alpine:3.18  
+# Build the Go binary
+RUN go build -o server .
 
-WORKDIR /root/
+# Expose ports
+EXPOSE 8080 8443
 
-# Install necessary runtime dependencies
-RUN apk add --no-cache ca-certificates libc6-compat  
-
-# Copy the compiled binary from the builder stage
-COPY --from=builder /app/healthsync .
-
-# Ensure the binary has execution permissions
-RUN chmod +x ./healthsync  
-
-# Expose application port
-EXPOSE 8080  
-
-# Set entrypoint
-ENTRYPOINT ["/root/healthsync"]
+# Run the server
+CMD ["./server"]

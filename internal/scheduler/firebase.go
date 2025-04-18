@@ -33,7 +33,7 @@ func init() {
 
 // InitializeFirebase initializes the Firebase app and messaging client.
 func InitializeFirebase() error {
-	opt := option.WithCredentialsFile("/home/sriram/projects/FinalyrProj/Health-Sync/internal/scheduler/health-sync-30494-be8768d3833e.json")
+	opt := option.WithCredentialsFile("/Health-Sync/internal/scheduler/health-sync-30494-be8768d3833e.json")
 
 	projectID := os.Getenv("FIREBASE_PROJECT_ID")
 

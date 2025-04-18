@@ -10,7 +10,32 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data"
+      - pgdata:/var/lib/postgresql/data
+
+  go-server:
+    build: .
+    container_name: go-server
+    restart: always
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    depends_on:
+      - postgres
+    environment:
+      - DATABASE_URL=postgres://admin:adminofheal@postgres:5432/healthsync_db?sslmode=disable
+    env_file:
+      - .env
+    volumes:
+      - .env:/Health-Sync/cmd/.env
+      - ./internal/scheduler/health-sync-30494-be8768d3833e.json:/Health-Sync/internal/scheduler/health-sync-30494-be8768d3833e.json
+      - ./cert.pem:/Health-Sync/cert.pem 
+      - ./key.pem:/Health-Sync/key.pem 
+    networks:
+      - default
 
 volumes:
   pgdata:
+
+networks:
+  default:
+    driver: bridge

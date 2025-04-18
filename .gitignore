@@ -5,3 +5,5 @@ bin/
 .env
 *.json
 *.pem
+*.key
+*.cert

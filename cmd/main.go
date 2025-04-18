@@ -73,7 +73,7 @@ func main() {
 		}
 	}()
 	go func() {
-		if err := httpsServer.ListenAndServeTLS("cert.pem", "key.pem"); err != nil && err != http.ErrServerClosed {
+		if err := httpsServer.ListenAndServeTLS("/Health-Sync/cert.pem", "/Health-Sync/key.pem"); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start Https server: %v", err)
 		}
 	}()
